@@ -1,14 +1,20 @@
 (() => {
+  // Configurable Parameters
+  const EXIT_INTENT_CONFIG = {
+      scrollThresholdPercent: 25,
+      maxScrollDistance: 2000,
+      scrollDelay: 500,
+      timeOnSite: 30 * 1000
+  };
+
   let exitIntentShown = false;
   const exitIntentCookieKey = 'exitIntentDismissed';
 
   const attr = 'data-ei-element';
   const dialog = document.querySelector(`[${attr}="dialog"]`);
 
-  // Check if dialog exists and browser supports showModal
   if (!dialog || typeof dialog.showModal !== 'function') return;
 
-  // Check if exit intent has been dismissed in the last 24 hours
   function hasRecentDismissal() {
       const dismissedAt = getCookie(exitIntentCookieKey);
       if (!dismissedAt) return false;
@@ -17,7 +23,6 @@
       return parseInt(dismissedAt) > twentyFourHoursAgo;
   }
 
-  // Utility function to set a cookie
   function setCookie(name, value, days) {
       const date = new Date();
       date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
@@ -25,7 +30,6 @@
       document.cookie = `${name}=${value};${expires};path=/;SameSite=Strict`;
   }
 
-  // Utility function to get a cookie
   function getCookie(name) {
       const cookieName = `${name}=`;
       const decodedCookie = decodeURIComponent(document.cookie);
@@ -42,47 +46,135 @@
       return "";
   }
 
-  // Variables to store event listener references
   let mouseLeaveHandler, mouseEnterHandler, scrollHandler;
   let timeOnSiteTimeout, mouseLeaveTimeout, scrollTimeout;
 
-  // Variables for dialog event listeners and elements
   let ctaClick, closeButtonClick, dialogBackdropClick, dialogClose;
   let cta, close;
 
-  // Function to handle exit intent trigger
   function handleExitIntent(reason) {
     logIntent(`Reason: ${reason}`);
     if (exitIntentShown || hasRecentDismissal()) return;
-    exitIntentShown = true; // Set immediately to prevent duplicates
+    exitIntentShown = true;
 
     handleDialog();
     removeExitIntentEventListeners();
+  }
+
+  function initDesktopTriggers() {
+    let mouseLeftWindow = false;
+
+    mouseLeaveHandler = function () {
+      if (!exitIntentShown) {
+        mouseLeftWindow = true;
+
+        mouseLeaveTimeout = setTimeout(function () {
+          if (mouseLeftWindow && !exitIntentShown) handleExitIntent('mouseLeave');
+        }, 500);
+      }
+    };
+
+    mouseEnterHandler = function () {
+      mouseLeftWindow = false;
+      if (mouseLeaveTimeout) {
+        clearTimeout(mouseLeaveTimeout);
+        mouseLeaveTimeout = null;
+      }
+    };
+
+    document.addEventListener('mouseleave', mouseLeaveHandler);
+    document.addEventListener('mouseenter', mouseEnterHandler);
+  }
+
+  function initMobileTriggers() {
+    let lastScrollTop = 0;
+
+    function getScrollThreshold() {
+      const totalHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight
+      );
+      const percentThreshold = (EXIT_INTENT_CONFIG.scrollThresholdPercent / 100) * totalHeight;
+      return Math.min(percentThreshold, EXIT_INTENT_CONFIG.maxScrollDistance);
+    }
+
+    function debounce(func, wait) {
+      let timeout;
+      return function (...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), wait);
+      };
+    }
+
+    scrollHandler = debounce(function () {
+      const st = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollThreshold = getScrollThreshold();
+
+      if (st < lastScrollTop && st > scrollThreshold && !exitIntentShown) {
+        handleExitIntent('scroll');
+      }
+      lastScrollTop = st <= 0 ? 0 : st;
+    }, EXIT_INTENT_CONFIG.scrollDelay);
+
+    window.addEventListener('scroll', scrollHandler);
+  }
+
+  function initTimeOnSiteTrigger() {
+    timeOnSiteTimeout = setTimeout(function () {
+      if (!exitIntentShown) handleExitIntent('timeOnSite');
+    }, EXIT_INTENT_CONFIG.timeOnSite);
+  }
+
+  function removeExitIntentEventListeners() {
+    if (mouseLeaveHandler) document.removeEventListener('mouseleave', mouseLeaveHandler);
+    if (mouseEnterHandler) document.removeEventListener('mouseenter', mouseEnterHandler);
+    if (scrollHandler) window.removeEventListener('scroll', scrollHandler);
+    if (timeOnSiteTimeout) clearTimeout(timeOnSiteTimeout);
+    if (mouseLeaveTimeout) clearTimeout(mouseLeaveTimeout);
+    if (scrollTimeout) clearTimeout(scrollTimeout);
+  }
+
+  function initExitIntent() {
+    function isTouchDevice() {
+      return (
+        'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0
+      );
+    }
+
+    if (hasRecentDismissal()) {
+      exitIntentShown = true;
+      return;
+    }
+
+    if (isTouchDevice()) {
+      initMobileTriggers();
+    } else {
+      initDesktopTriggers();
+    }
+
+    initTimeOnSiteTrigger();
   }
 
   function handleDialog() {
     dialog.showModal();
     logExitIntentView();
 
-    // Get dialog elements
     close = dialog.querySelector(`[${attr}="close"]`);
     cta = dialog.querySelector(`[${attr}="cta"]`);
 
-    // Event handler for CTA button click
     ctaClick = function () {
       logExitIntentClick();
       removeDialogEventListeners();
     };
     cta.addEventListener('click', ctaClick);
 
-    // Event handler for close button click
     closeButtonClick = function () {
       closeDialog();
       removeDialogEventListeners();
     };
     close.addEventListener('click', closeButtonClick);
 
-    // Event handler for dialog backdrop click
     dialogBackdropClick = function (event) {
       if (event.target !== dialog) return;
       closeDialog();
@@ -90,8 +182,8 @@
     };
     dialog.addEventListener('click', dialogBackdropClick);
 
-    // Event handler for dialog close event
     dialogClose = function () {
+      closeDialog();
       logExitIntentClose();
       removeDialogEventListeners();
     };
@@ -100,10 +192,7 @@
 
   function closeDialog() {
     if (dialog.open) dialog.close();
-    
-    // Set cookie to prevent re-showing for 24 hours
     setCookie(exitIntentCookieKey, Date.now(), 1);
-    
     logExitIntentClose();
   }
 
@@ -114,7 +203,6 @@
     if (dialogClose) dialog.removeEventListener('close', dialogClose);
   }
   
-  // Existing logging functions remain the same
   function logExitIntentView() {
     gtag('event', 'Exit_intent_show');
   }
@@ -127,10 +215,10 @@
     gtag('event', 'Exit_intent_cta_click');
   }
 
-  // Remaining functions (removeExitIntentEventListeners, initDesktopTriggers, 
-  // initMobileTriggers, initTimeOnSiteTrigger, initExitIntent, logIntent) 
-  // remain exactly the same as in the original script
+  function logIntent(reason) {
+    if (!window.location.host.includes('test.landc.co.uk')) return;
+    console.log(`Intent triggered, reason: ${reason}`);
+  }
 
-  // Initialize the exit intent script
   initExitIntent();
 })();
