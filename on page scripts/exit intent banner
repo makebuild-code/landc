@@ -1,5 +1,4 @@
   //Tim edit
-  
   (() => {
     let exitIntentShown = false;
     const exitIntentShowKey = 'exitIntentShown';
