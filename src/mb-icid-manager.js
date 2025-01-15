@@ -17,17 +17,17 @@ class IDManager {
         linkSelector = '',
         customBodyAttribute = '',
     } = {}) {
-        this.debug = debug
-        this.idCookieName = idCookieName
-        this.idQueryParam = idQueryParam.toLowerCase() // Normalize to lower case for case-insensitive handling
-        this.cookieDays = cookieDays
-        this.linkSelector = linkSelector
-        this.customBodyAttribute = customBodyAttribute
+        this.debug = debug;
+        this.idCookieName = idCookieName;
+        this.idQueryParam = idQueryParam.toLowerCase(); // Normalize to lower case
+        this.cookieDays = cookieDays;
+        this.linkSelector = linkSelector;
+        this.customBodyAttribute = customBodyAttribute;
     }
 
     debugLog(message) {
         if (this.debug) {
-            //console.log(`IDManager, ${this.idCookieName}:`, message)
+            console.log(`IDManager, ${this.idCookieName}:`, message);
         }
     }
 
@@ -35,44 +35,31 @@ class IDManager {
      * Initializes the ID handling process.
      */
     init() {
-        // Attempt to update ID from the custom body attribute first.
-        const idSetFromBodyAttribute = this.updateIDFromCustomAttribute()
-
-        // Store the ID from the URL only if it wasn't set by the body attribute.
+        const idSetFromBodyAttribute = this.updateIDFromCustomAttribute();
         if (!idSetFromBodyAttribute) {
-            this.storeID()
+            this.storeID();
         }
-
-        // Append the ID to all relevant links if linkSelector is specified,
-        // regardless of where the ID was set from.
-        this.appendIDToLinks()
+        this.appendIDToLinks();
     }
 
     /**
      * Updates the ID based on a custom attribute on the <body> element.
-     * Returns true if the ID was found and set, false otherwise.
      * @returns {boolean} Whether the ID was set from the custom body attribute.
      */
     updateIDFromCustomAttribute() {
         if (this.customBodyAttribute) {
-            const bodyAttributeID = document.body.getAttribute(
-                this.customBodyAttribute
-            )
+            const bodyAttributeID = document.body.getAttribute(this.customBodyAttribute);
             if (bodyAttributeID) {
-                this.setCookie(bodyAttributeID)
-                this.debugLog(`ID from body attribute set: ${bodyAttributeID}`)
-                return true // Indicate that the ID was successfully set from the body attribute.
+                this.setCookie(bodyAttributeID);
+                this.debugLog(`ID from body attribute set: ${bodyAttributeID}`);
+                return true;
             } else {
-                // Custom body attribute is present but has no value
-                this.debugLog(
-                    `No value found for body attribute: ${this.customBodyAttribute}`
-                )
-                return false
+                this.debugLog(`No value found for body attribute: ${this.customBodyAttribute}`);
+                return false;
             }
         } else {
-            // No custom body attribute defined
-            this.debugLog('No custom body attribute defined.')
-            return false // No ID was set from the body attribute.
+            this.debugLog('No custom body attribute defined.');
+            return false;
         }
     }
 
@@ -80,9 +67,11 @@ class IDManager {
      * Stores the ID from the URL query parameter to a cookie.
      */
     storeID() {
-        const id = this.getQueryParam()
+        const id = this.getQueryParam();
         if (id) {
-            this.setCookie(id)
+            this.setCookie(id);
+        } else {
+            this.debugLog(`ID not found in query parameters.`);
         }
     }
 
@@ -90,33 +79,41 @@ class IDManager {
      * Appends the ID to all links that match the linkSelector.
      */
     appendIDToLinks() {
-        if (!this.linkSelector) return // Skip if linkSelector is not defined
+        if (!this.linkSelector) return;
 
-        const links = document.querySelectorAll(this.linkSelector)
-        const id = this.getCookie()
+        const links = document.querySelectorAll(this.linkSelector);
+        const id = this.getCookie();
         if (id) {
             links.forEach((link) => {
-                const url = new URL(link.href)
-                url.searchParams.set(this.idQueryParam, id)
-                link.href = url.toString()
-                this.debugLog(`ID appended to URL: ${url}`)
-            })
+                const url = new URL(link.href);
+                url.searchParams.set(this.idQueryParam, id);
+                link.href = url.toString();
+                this.debugLog(`ID appended to URL: ${url}`);
+            });
+        } else {
+            this.debugLog(`No ID found in cookies to append to links.`);
         }
     }
 
     /**
-     * Retrieves the value of the URL parameter specified by idQueryParam, treating parameter names as case-insensitive.
+     * Retrieves the value of the URL parameter specified by idQueryParam.
      * @returns {string|null} The value of the query parameter, if it exists; otherwise, null.
      */
     getQueryParam() {
-        const urlParams = new URLSearchParams(window.location.search)
-        for (const [key, value] of urlParams.entries()) {
-            if (key.toLowerCase() === this.idQueryParam.toLowerCase()) {
-                this.debugLog(`QueryParam - ${key}: ${value}`)
-                return value
+        try {
+            const decodedURL = decodeURIComponent(window.location.href);
+            const urlParams = new URLSearchParams(new URL(decodedURL).search);
+            this.debugLog(`Full URLSearchParams: ${Array.from(urlParams.entries())}`);
+            for (const [key, value] of urlParams.entries()) {
+                if (key.toLowerCase() === this.idQueryParam.toLowerCase()) {
+                    this.debugLog(`Matched QueryParam - Key: ${key}, Value: ${value}`);
+                    return value;
+                }
             }
+        } catch (error) {
+            this.debugLog(`Error parsing query parameters: ${error.message}`);
         }
-        return null
+        return null;
     }
 
     /**
@@ -124,11 +121,11 @@ class IDManager {
      * @param {string} value - The value of the ID to store.
      */
     setCookie(value) {
-        const d = new Date()
-        d.setTime(d.getTime() + this.cookieDays * 24 * 60 * 60 * 1000)
-        let expires = 'expires=' + d.toUTCString()
-        document.cookie = `${this.idCookieName}=${value};${expires};path=/`
-        this.debugLog(`Cookie set - ${this.idCookieName}: ${value}`)
+        const d = new Date();
+        d.setTime(d.getTime() + this.cookieDays * 24 * 60 * 60 * 1000);
+        let expires = 'expires=' + d.toUTCString();
+        document.cookie = `${this.idCookieName}=${value};${expires};path=/`;
+        this.debugLog(`Cookie set - ${this.idCookieName}: ${value}`);
     }
 
     /**
@@ -136,9 +133,9 @@ class IDManager {
      * @returns {string|null} The value of the cookie if found; otherwise, null.
      */
     getCookie() {
-        const value = `; ${document.cookie}`
-        const parts = value.split(`; ${this.idCookieName}=`)
-        if (parts.length === 2) return parts.pop().split(';').shift()
-        return null
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${this.idCookieName}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
     }
 }
