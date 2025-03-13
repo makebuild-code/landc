@@ -4640,7 +4640,7 @@
       }
   };
   
-  export default FormChippy;
+  
   
   
   
