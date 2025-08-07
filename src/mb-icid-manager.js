@@ -105,7 +105,8 @@ class IDManager {
    */
   getQueryParam() {
     try {
-      const urlParams = new URLSearchParams(window.location.search);
+      const decodedURL = decodeURIComponent(window.location.href);
+      const urlParams = new URLSearchParams(new URL(decodedURL).search);
       this.debugLog(`Full URLSearchParams: ${Array.from(urlParams.entries())}`);
       for (const [key, value] of urlParams.entries()) {
         if (key.toLowerCase() === this.idQueryParam.toLowerCase()) {
