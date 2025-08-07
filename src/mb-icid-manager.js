@@ -1,5 +1,4 @@
 class IDManager {
-     * @param {string} [config.idCookieName='ID'] - The name of the cookie for storing the ID.
   /**
    * Constructs the IDManager with configurable parameters for handling IDs.
    * @param {Object} config - Configuration object for IDManager.
