@@ -108,15 +108,16 @@ class IDManager {
         ? this.getEncodedParams()
         : this.getDecodedParams();
 
-    this.debugLog(`URLSearchParams: ${params}`);
-
     for (const param of params) {
       if (param.key === this.idQueryParam) {
-        this.debugLog(`Matched QueryParam - Key: ${key}, Value: ${value}`);
+        this.debugLog(
+          `Matched QueryParam - Key: ${param.key}, Value: ${param.value}`
+        );
         return param.value;
       }
     }
 
+    this.debugLog(`No matching query parameter found for ${this.idQueryParam}`);
     return null;
   }
 
