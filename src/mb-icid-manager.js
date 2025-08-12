@@ -1,13 +1,12 @@
 class IDManager {
   /**
    * Constructs the IDManager with configurable parameters for handling IDs.
-   * @param {Object} config - Configuration object for IDManager.
-   * @param {boolean} [config.debug=true] - Enable debug logging if true.
-   * @param {string} [config.idCookieName='ID'] - The name of the cookie for storing the ID.
-   * @param {string} config.idQueryParam - The query parameter name for the ID, case-insensitive.
-   * @param {number} [config.cookieDays=90] - The number of days until the cookie expires.
-   * @param {string} [config.linkSelector=''] - CSS selector for links to append ID. Optional.
-   * @param {string} [config.customBodyAttribute=''] - Custom attribute name on the body tag for the ID. Optional.
+   * @param {boolean} [debug = true] - Enable debug logging if true.
+   * @param {string} [idCookieName = 'ID'] - The key to store the cookie in the browser.
+   * @param {string} [idQueryParam] - The query parameter name to find the ID in the URL.
+   * @param {number} [cookieDays = 90] - The number of days until the cookie expires.
+   * @param {string} [linkSelector = ''] - CSS selector for links to append ID.
+   * @param {string} [customBodyAttribute = ''] - Custom attribute name on the body tag to find the ID.
    */
   constructor({
     debug = true,
@@ -19,15 +18,18 @@ class IDManager {
   } = {}) {
     this.debug = debug;
     this.idCookieName = idCookieName;
-    this.idQueryParam = idQueryParam.toLowerCase(); // Normalize to lower case
+    this.idQueryParam = idQueryParam;
     this.cookieDays = cookieDays;
     this.linkSelector = linkSelector;
     this.customBodyAttribute = customBodyAttribute;
+    this.id = null;
+
+    this.init();
   }
 
-  debugLog(message) {
+  debugLog(...args) {
     if (this.debug) {
-      console.log(`IDManager, ${this.idCookieName}:`, message);
+      console.log(`[IDManager] ${this.idCookieName}:`, ...args);
     }
   }
 
@@ -36,9 +38,7 @@ class IDManager {
    */
   init() {
     const idSetFromBodyAttribute = this.updateIDFromCustomAttribute();
-    if (!idSetFromBodyAttribute) {
-      this.storeID();
-    }
+    if (!idSetFromBodyAttribute) this.storeID();
     this.appendIDToLinks();
   }
 
@@ -47,77 +47,121 @@ class IDManager {
    * @returns {boolean} Whether the ID was set from the custom body attribute.
    */
   updateIDFromCustomAttribute() {
-    if (this.customBodyAttribute) {
-      const bodyAttributeID = document.body.getAttribute(
-        this.customBodyAttribute
-      );
-      if (bodyAttributeID) {
-        this.setCookie(bodyAttributeID);
-        this.debugLog(`ID from body attribute set: ${bodyAttributeID}`);
-        return true;
-      } else {
-        this.debugLog(
-          `No value found for body attribute: ${this.customBodyAttribute}`
-        );
-        return false;
-      }
-    } else {
+    if (!this.customBodyAttribute) {
       this.debugLog("No custom body attribute defined.");
       return false;
     }
+
+    const bodyAttributeID = document.body.getAttribute(
+      this.customBodyAttribute
+    );
+
+    if (!bodyAttributeID) {
+      this.debugLog(
+        `No value found for body attribute: ${this.customBodyAttribute}`
+      );
+      return false;
+    }
+
+    this.setCookie(bodyAttributeID);
+    this.id = bodyAttributeID;
+    this.debugLog(`ID from body attribute set: ${bodyAttributeID}`);
+    return true;
   }
 
   /**
    * Stores the ID from the URL query parameter to a cookie.
    */
   storeID() {
-    const id = this.getQueryParam();
-    if (id) {
-      this.setCookie(id);
-    } else {
+    const id = this.getQueryParamValue();
+    if (!id) {
       this.debugLog(`ID not found in query parameters.`);
+      return;
     }
+
+    this.setCookie(id);
+    this.id = id;
   }
 
   /**
    * Appends the ID to all links that match the linkSelector.
    */
   appendIDToLinks() {
-    if (!this.linkSelector) return;
+    if (!this.linkSelector || !this.id) return;
 
     const links = document.querySelectorAll(this.linkSelector);
-    const id = this.getCookie();
-    if (id) {
-      links.forEach((link) => {
-        const url = new URL(link.href);
-        url.searchParams.set(this.idQueryParam, id);
-        link.href = url.toString();
-        this.debugLog(`ID appended to URL: ${url}`);
-      });
-    } else {
-      this.debugLog(`No ID found in cookies to append to links.`);
-    }
+    [...links].forEach((link) => {
+      const url = new URL(link.href);
+      url.searchParams.set(this.idQueryParam, this.id);
+      link.href = url.toString();
+      this.debugLog(`ID appended to URL: ${url}`);
+    });
   }
 
   /**
    * Retrieves the value of the URL parameter specified by idQueryParam.
-   * @returns {string|null} The value of the query parameter, if it exists; otherwise, null.
+   * @returns {string | null} The value of the query parameter, if it exists; otherwise, null.
    */
-  getQueryParam() {
-    try {
-      const decodedURL = decodeURIComponent(window.location.href);
-      const urlParams = new URLSearchParams(new URL(decodedURL).search);
-      this.debugLog(`Full URLSearchParams: ${Array.from(urlParams.entries())}`);
-      for (const [key, value] of urlParams.entries()) {
-        if (key.toLowerCase() === this.idQueryParam.toLowerCase()) {
-          this.debugLog(`Matched QueryParam - Key: ${key}, Value: ${value}`);
-          return value;
+  getQueryParamValue() {
+    const params =
+      this.idQueryParam === "bp_e"
+        ? this.getEncodedParams()
+        : this.getDecodedParams();
+
+    for (const param of params) {
+      if (param.key === this.idQueryParam) {
+        this.debugLog(
+          `Matched QueryParam - Key: ${param.key}, Value: ${param.value}`
+        );
+        return param.value;
+      }
+    }
+
+    this.debugLog(`No matching query parameter found for ${this.idQueryParam}`);
+    return null;
+  }
+
+  /**
+   * A decoded array of key-value pairs from the URL search parameters.
+   * @returns {Array<{key: string, value: string}>}
+   */
+  getDecodedParams() {
+    const { search } = window.location;
+    const params = new URLSearchParams(search);
+    const decoded = [];
+
+    for (const [key, value] of params.entries()) {
+      decoded.push({ key, value });
+    }
+
+    return decoded;
+  }
+
+  /**
+   * An encoded array of key-value pairs from the URL search parameters.
+   * @returns {Array<{key: string, value: string}>}
+   */
+  getEncodedParams() {
+    const { search } = window.location;
+
+    // Parse manually to avoid automatic URL decoding
+    if (search && search.length > 1) {
+      const queryString = search.substring(1); // Remove leading '?'
+      const pairs = queryString.split("&");
+
+      const encoded = [];
+
+      for (const pair of pairs) {
+        const separatorIndex = pair.indexOf("=");
+        if (separatorIndex !== -1) {
+          const key = pair.substring(0, separatorIndex);
+          const value = pair.substring(separatorIndex + 1);
+          encoded.push({ key, value });
         }
       }
-    } catch (error) {
-      this.debugLog(`Error parsing query parameters: ${error.message}`);
+
+      return encoded;
     }
-    return null;
   }
 
   /**
