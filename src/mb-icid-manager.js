@@ -108,6 +108,8 @@ class IDManager {
         ? this.getEncodedParams()
         : this.getDecodedParams();
 
+    if (!Array.isArray(params)) return null;
+
     for (const param of params) {
       if (param.key === this.idQueryParam) {
         this.debugLog(
@@ -130,6 +132,8 @@ class IDManager {
     const params = new URLSearchParams(search);
     const decoded = [];
 
+    if (!params || params.size === 0) return decoded;
+
     for (const [key, value] of params.entries()) {
       decoded.push({ key, value });
     }
@@ -150,6 +154,8 @@ class IDManager {
       const pairs = queryString.split("&");
 
       const encoded = [];
+
+      if (!pairs || pairs.length === 0) return encoded;
 
       for (const pair of pairs) {
         const separatorIndex = pair.indexOf("=");
