@@ -18,7 +18,7 @@ class IDManager {
   } = {}) {
     this.debug = debug;
     this.idCookieName = idCookieName;
-    this.idQueryParam = idQueryParam;
+    this.idQueryParam = idQueryParam.toLowerCase();
     this.cookieDays = cookieDays;
     this.linkSelector = linkSelector;
     this.customBodyAttribute = customBodyAttribute;
