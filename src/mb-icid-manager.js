@@ -89,10 +89,13 @@ class IDManager {
   appendIDToLinks() {
     if (!this.linkSelector || !this.id) return;
 
+    const id = this.id ?? this.getCookie();
+    if (!id) return;
+
     const links = document.querySelectorAll(this.linkSelector);
     [...links].forEach((link) => {
       const url = new URL(link.href);
-      url.searchParams.set(this.idQueryParam, this.id);
+      url.searchParams.set(this.idQueryParam, id);
       link.href = url.toString();
       this.debugLog(`ID appended to URL: ${url}`);
     });
