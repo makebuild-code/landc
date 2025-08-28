@@ -115,7 +115,7 @@ class IDManager {
     if (!Array.isArray(params)) return null;
 
     for (const param of params) {
-      if (param.key === this.idQueryParam) {
+      if (param.key.toLowerCase() === this.idQueryParam) {
         this.debugLog(
           `Matched QueryParam - Key: ${param.key}, Value: ${param.value}`
         );
