@@ -89,6 +89,7 @@ class IDManager {
   appendIDToLinks() {
     if (!this.linkSelector || !this.id) return;
 
+    // pull id from memory if available and cookies if not
     const id = this.id ?? this.getCookie();
     if (!id) return;
 
