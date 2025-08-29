@@ -32,9 +32,10 @@ class IDManager {
   init() {
     const value =
       this.getValueFromBody() ?? this.getValueFromParam() ?? this.getCookie();
-    this.setCookie(value);
+    if (!value) return;
 
-    if (value) this.appendValueToLinks(value);
+    this.setCookie(value);
+    this.appendValueToLinks(value);
   }
 
   /**
