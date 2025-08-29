@@ -77,7 +77,7 @@ class IDManager {
     const { search } = window.location;
 
     // Parse manually to avoid automatic URL decoding
-    if (!search || search.length < 1) return [];
+    if (!search || search.length <= 1) return []; // Only runs when there is atleast one param
 
     const queryString = search.substring(1); // Remove leading '?'
     const pairs = queryString.split("&");
