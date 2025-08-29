@@ -70,24 +70,6 @@ class IDManager {
   }
 
   /**
-   * A decoded array of key-value pairs from the URL search parameters.
-   * @returns { Array<{key: string, value: string}> }
-   */
-  getDecodedParams() {
-    const { search } = window.location;
-    const params = new URLSearchParams(search);
-    const decoded = [];
-
-    if (!params || params.size === 0) return decoded;
-
-    for (const [key, value] of params.entries()) {
-      decoded.push({ key, value });
-    }
-
-    return decoded;
-  }
-
-  /**
    * An encoded array of key-value pairs from the URL search parameters.
    * @returns { Array<{key: string, value: string}> }
    */
@@ -111,6 +93,24 @@ class IDManager {
     }
 
     return encoded;
+  }
+
+  /**
+   * A decoded array of key-value pairs from the URL search parameters.
+   * @returns { Array<{key: string, value: string}> }
+   */
+  getDecodedParams() {
+    const { search } = window.location;
+    const params = new URLSearchParams(search);
+    const decoded = [];
+
+    if (!params || params.size === 0) return decoded;
+
+    for (const [key, value] of params.entries()) {
+      decoded.push({ key, value });
+    }
+
+    return decoded;
   }
 
   /**
