@@ -1,135 +1,76 @@
 class IDManager {
   /**
    * Constructs the IDManager with configurable parameters for handling IDs.
-   * @param {boolean} [debug = true] - Enable debug logging if true.
-   * @param {string} [idCookieName = 'ID'] - The key to store the cookie in the browser.
-   * @param {string} [idQueryParam] - The query parameter name to find the ID in the URL.
-   * @param {number} [cookieDays = 90] - The number of days until the cookie expires.
-   * @param {string} [linkSelector = ''] - CSS selector for links to append ID.
-   * @param {string} [customBodyAttribute = ''] - Custom attribute name on the body tag to find the ID.
+   * @param { boolean } [ debug = false ] - Enable debug logging if true.
+   * @param { string } [ attributeName ] - Custom attribute name on the body tag to find the ID.
+   * @param { string } [ queryParam ] - The query parameter name to find the ID in the URL.
+   * @param { string } [ cookieName ] - The key to store the cookie in the browser.
+   * @param { number } [ cookieDays = 90 ] - The number of days until the cookie expires.
+   * @param { string } [ linkSelector ] - CSS selector for links to append ID.
    */
   constructor({
-    debug = true,
-    idCookieName = "ID",
-    idQueryParam,
+    debug = false,
+    attributeName,
+    queryParam,
+    cookieName,
     cookieDays = 90,
-    linkSelector = "",
-    customBodyAttribute = "",
+    linkSelector,
   } = {}) {
     this.debug = debug;
-    this.idCookieName = idCookieName;
-    this.idQueryParam = idQueryParam.toLowerCase();
+    this.attributeName = attributeName;
+    this.queryParam = queryParam;
+    this.cookieName = cookieName;
     this.cookieDays = cookieDays;
     this.linkSelector = linkSelector;
-    this.customBodyAttribute = customBodyAttribute;
-    this.id = null;
 
     this.init();
-  }
-
-  debugLog(...args) {
-    if (this.debug) {
-      console.log(`[IDManager] ${this.idCookieName}:`, ...args);
-    }
   }
 
   /**
    * Initializes the ID handling process.
    */
   init() {
-    const idSetFromBodyAttribute = this.updateIDFromCustomAttribute();
-    if (!idSetFromBodyAttribute) this.storeID();
-    this.appendIDToLinks();
+    const value =
+      this.getValueFromBody() ?? this.getValueFromParam() ?? this.getCookie();
+    this.setCookie(value);
+
+    if (value) this.appendValueToLinks(value);
   }
 
   /**
-   * Updates the ID based on a custom attribute on the <body> element.
-   * @returns {boolean} Whether the ID was set from the custom body attribute.
+   * Gets the ID from the <body> element.
+   * @returns { string | undefined }
    */
-  updateIDFromCustomAttribute() {
-    if (!this.customBodyAttribute) {
-      this.debugLog("No custom body attribute defined.");
-      return false;
-    }
-
-    const bodyAttributeID = document.body.getAttribute(
-      this.customBodyAttribute
-    );
-
-    if (!bodyAttributeID) {
-      this.debugLog(
-        `No value found for body attribute: ${this.customBodyAttribute}`
-      );
-      return false;
-    }
-
-    this.setCookie(bodyAttributeID);
-    this.id = bodyAttributeID;
-    this.debugLog(`ID from body attribute set: ${bodyAttributeID}`);
-    return true;
+  getValueFromBody() {
+    const value = document.body.getAttribute(this.attributeName);
+    return value;
   }
 
   /**
-   * Stores the ID from the URL query parameter to a cookie.
+   * Gets the ID from the URL query parameter
+   * @returns { string | null } The value of the query parameter if it exists; otherwise, null.
    */
-  storeID() {
-    const id = this.getQueryParamValue();
-    if (!id) {
-      this.debugLog(`ID not found in query parameters.`);
-      return;
-    }
-
-    this.setCookie(id);
-    this.id = id;
-  }
-
-  /**
-   * Appends the ID to all links that match the linkSelector.
-   */
-  appendIDToLinks() {
-    if (!this.linkSelector || !this.id) return;
-
-    // pull id from memory if available and cookies if not
-    const id = this.id ?? this.getCookie();
-    if (!id) return;
-
-    const links = document.querySelectorAll(this.linkSelector);
-    [...links].forEach((link) => {
-      const url = new URL(link.href);
-      url.searchParams.set(this.idQueryParam, id);
-      link.href = url.toString();
-      this.debugLog(`ID appended to URL: ${url}`);
-    });
-  }
-
-  /**
-   * Retrieves the value of the URL parameter specified by idQueryParam.
-   * @returns {string | null} The value of the query parameter, if it exists; otherwise, null.
-   */
-  getQueryParamValue() {
+  getValueFromParam() {
     const params =
-      this.idQueryParam === "bp_e"
+      this.queryParam === "bp_e"
         ? this.getEncodedParams()
         : this.getDecodedParams();
 
     if (!Array.isArray(params)) return null;
 
     for (const param of params) {
-      if (param.key.toLowerCase() === this.idQueryParam) {
-        this.debugLog(
-          `Matched QueryParam - Key: ${param.key}, Value: ${param.value}`
-        );
-        return param.value;
-      }
+      if (param.key.toLowerCase() !== this.queryParam.toLowerCase()) continue;
+      this.debugLog(`Match - Key: ${param.key}, Value: ${param.value}`);
+      return param.value;
     }
 
-    this.debugLog(`No matching query parameter found for ${this.idQueryParam}`);
+    this.debugLog(`No match found for ${this.queryParam}`);
     return null;
   }
 
   /**
    * A decoded array of key-value pairs from the URL search parameters.
-   * @returns {Array<{key: string, value: string}>}
+   * @returns { Array<{key: string, value: string}> }
    */
   getDecodedParams() {
     const { search } = window.location;
@@ -147,53 +88,76 @@ class IDManager {
 
   /**
    * An encoded array of key-value pairs from the URL search parameters.
-   * @returns {Array<{key: string, value: string}>}
+   * @returns { Array<{key: string, value: string}> }
    */
   getEncodedParams() {
     const { search } = window.location;
 
     // Parse manually to avoid automatic URL decoding
-    if (search && search.length > 1) {
-      const queryString = search.substring(1); // Remove leading '?'
-      const pairs = queryString.split("&");
+    if (!search || search.length < 1) return [];
 
-      const encoded = [];
+    const queryString = search.substring(1); // Remove leading '?'
+    const pairs = queryString.split("&");
 
-      if (!pairs || pairs.length === 0) return encoded;
-
-      for (const pair of pairs) {
-        const separatorIndex = pair.indexOf("=");
-        if (separatorIndex !== -1) {
-          const key = pair.substring(0, separatorIndex);
-          const value = pair.substring(separatorIndex + 1);
-          encoded.push({ key, value });
-        }
+    const encoded = [];
+    for (const pair of pairs) {
+      const separatorIndex = pair.indexOf("=");
+      if (separatorIndex !== -1) {
+        const key = pair.substring(0, separatorIndex);
+        const value = pair.substring(separatorIndex + 1);
+        encoded.push({ key, value });
       }
-
-      return encoded;
     }
-  }
 
-  /**
-   * Sets a cookie with the specified name and value for a number of days.
-   * @param {string} value - The value of the ID to store.
-   */
-  setCookie(value) {
-    const d = new Date();
-    d.setTime(d.getTime() + this.cookieDays * 24 * 60 * 60 * 1000);
-    let expires = "expires=" + d.toUTCString();
-    document.cookie = `${this.idCookieName}=${value};${expires};path=/`;
-    this.debugLog(`Cookie set - ${this.idCookieName}: ${value}`);
+    return encoded;
   }
 
   /**
    * Retrieves a cookie by name.
-   * @returns {string|null} The value of the cookie if found; otherwise, null.
+   * @returns { string | null } The value of the cookie if found; otherwise, null.
    */
   getCookie() {
     const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${this.idCookieName}=`);
-    if (parts.length === 2) return parts.pop().split(";").shift();
-    return null;
+    const parts = value.split(`; ${this.cookieName}=`);
+    if (parts.length !== 2) return null;
+    return parts.pop().split(";").shift();
+  }
+
+  /**
+   * Sets a cookie with the specified name and value for a number of days.
+   * @param { string } value - The value of the ID to store.
+   */
+  setCookie(value) {
+    const date = new Date();
+    date.setTime(date.getTime() + this.cookieDays * 24 * 60 * 60 * 1000);
+    const safeValue = encodeURIComponent(value);
+    const expires = "expires=" + date.toUTCString();
+
+    document.cookie = `${this.cookieName}=${safeValue};${expires};path=/`;
+
+    this.debugLog(`Cookie set - ${this.cookieName}: ${value}`);
+  }
+
+  /**
+   * Appends the ID to all links that match the linkSelector.
+   */
+  appendValueToLinks(value) {
+    if (!value || !this.linkSelector) return;
+
+    const links = document.querySelectorAll(this.linkSelector);
+    [...links].forEach((link) => {
+      try {
+        const url = new URL(link.href);
+        url.searchParams.set(this.queryParam, value);
+        link.href = url.toString();
+        this.debugLog(`Value appended to URL: ${url}`);
+      } catch (error) {
+        this.debugLog(`Error appending value to link: ${link.href}`, error);
+      }
+    });
+  }
+
+  debugLog(...args) {
+    if (this.debug) console.log(`[IDManager] ${this.cookieName}:`, ...args);
   }
 }
